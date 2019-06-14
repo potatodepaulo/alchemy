@@ -1,7 +1,7 @@
 (function() {
-    const ACCOUNT_ID = 'one.taters'; /* TODO: fill this in! */
-    const DEFAULT_ENV = 'local';
-    const APP_NAME = "Crypto Corgis";
+    const ACCOUNT_ID = 'peter.alchemy'; /* TODO: fill this in! */
+    const DEFAULT_ENV = 'development';
+    const APP_NAME = "Alchemy";
 
     function getConfig(env) {
         switch (env) {

@@ -1,16 +1,7 @@
-export class Corgi {
-  owner: string;
+export class Item {
+  id: i32;
+  author: string; // accountId
   name: string;
-  dna: string;
-  color:string;
-  level: i32;
-  metadata: CorgiMetaData;
-}
-// ADDING THE TOKEN METADATA TO THE INDIVIDUAL CORGI ALLOWS INTEROP WITH OTHERS
-export class CorgiMetaData {
-  attributes: string[];
-}
-
-export class CorgiArray {
-  corgis: Array<Corgi>;
+  description: string;
+  imageUrl: string;
 }

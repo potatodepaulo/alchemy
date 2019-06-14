@@ -1,5 +1,5 @@
 {
-  "name": "crypo_corgis",
+  "name": "alchemy",
   "description": "",
   "version": "0.0.1",
   "scripts": {
@@ -33,8 +33,8 @@
     "webpack-stream": "^5.2.1"
   },
   "wasmStudio": {
-    "name": "Hello World Example",
-    "description": "The contract implements a single function to return \"Hello, World!\" using AssemblyScript",
+    "name": "Alchemy",
+    "description": "The contract implements a single function to return \"EVERYTHING\" using AssemblyScript",
     "icon": "typescript-lang-file-icon"
   },
   "dependencies": {

@@ -1,193 +1,105 @@
 import "allocator/arena";
 export { memory };
 
-import { context, storage, near, collections, base64 } from "./near";
-import { Corgi, CorgiArray, CorgiMetaData } from "./model.near";
+import { context, storage, near, collections } from "./near";
+import { Item } from "./model.near";
 
-// --- contract code goes below
-/////////////////////////////////
-// ERC721 for Non Fungible Tokens
-const NAME: string = "The NEAR Corgi Token";
-const SYMBOL: string = "CORG"
-const TOTAL_SUPPLY: u64 = 420;
-const DNA_DIGITS: u32 = 16;
-const HEX_ALPHABET = '0123456789abcdef';
+const RETURN_LIMIT = 20;
+const SEPARATOR_CODE = 58;
+const CRAFT_NUM_COMPONENTS_LIMIT = 3;
 
-export function init(initialOwner: string): void {
-  near.log("initialOwner: " + initialOwner);
-  assert(storage.getItem("init") == null, "Already initialized token supply");
-  storage.setU64("io::" + initialOwner, TOTAL_SUPPLY);
-  storage.setItem("init", "done");
+let items = collections.vector<Item>("iv");
+let itemsMap = collections.vector<string, i32>("im");
+
+function userItemsVec(accountId: string): collections.Vector<i32> {
+  return collections.vector<i32>("uiv:" + accountId);
 }
 
-// Collections where we store data
-let balances = collections.map<string, u64>("b");
-let corgis = collections.map<string, Corgi>("c");
-let corgisByOwner = collections.map<string, CorgiArray>("co");
-
-export function login():void {
+function userItemsMap(accountId: string): collections.Map<i32, i32> {
+  return collections.map<i32, i32>("uim:" + accountId);
 }
 
-export function balanceOf(owner: string): u64 {
-  return balances.get(owner);
-}
 
-export function ownerOf(tokenId: string): string {
-  let corgi = getCorgi(tokenId);
-  let owner = corgi.owner;
-  return owner;
-}
-
-export function totalSupply(): string {
-  return TOTAL_SUPPLY.toString();
-}
-
-export function name(): string {
-  return NAME;
-}
-
-export function symbol(): string {
-  return SYMBOL;
-}
-
-export function transfer(to: string, tokenId: string):void {
-  let corgi = getCorgi(tokenId);
-  assert(corgi.owner !== context.sender, "corgi does not belong to " + context.sender);
-  incrementNewOwnerCorgis(to, tokenId);
-  decrementOldOwnerCorgis(corgi.owner, tokenId);
-}
-
-function incrementNewOwnerCorgis(to: string, tokenId: string):void {
-  let corgi = getCorgi(tokenId);
-  corgi.owner = to;
-  near.log(to);
-  setCorgisByOwner(corgi);
-  setCorgi(corgi);
-}
-
-function decrementOldOwnerCorgis(from: string, tokenId: string):void {
-  let _corgis = corgisByOwner.get(from).corgis;
-  for (let i = 0; i < _corgis.length; i++) {
-    if (tokenId == _corgis[i].dna) {
-      _corgis.splice(i, 1);
-      near.log("match");
-    }
-  }
-  let oca = new CorgiArray()
-  oca.corgis = _corgis;
-  corgisByOwner.set(from, oca);
-}
-
-function updateBalance(owner: string, increment: u64): void {
-  let balance = balanceOf(owner);
-  if (balance) {
-    near.log(`${balance}`);
-  } else {
-    near.log("issues");
+function assertAccountId(accountId: string): void {
+  let n = accountId.length;
+  assert(n >= 5 && n <= 32, "Account ID length should be between 5 and 32 chars");
+  for (let i = 0; i < n; ++i) {
+    assert(accountId.charCodeAt(i) != SEPARATOR_CODE, "Can't contain `:`");
   }
 }
 
-function _createCorgi(name: string, dna: string, color:string): Corgi {
-  let corgi = new Corgi();
-  corgi.owner = context.sender;
-  corgi.dna = dna;
-  corgi.name = name;
-  corgi.color = color
-  setCorgi(corgi);
-  setCorgisByOwner(corgi);
-  return corgi;
-}
-
-export function generateRandomDna(): string {
-  let buf = near.randomBuffer(DNA_DIGITS);
-  let b64 = base64.encode(buf);
-  near.log(b64);
-  return b64;
-}
-function intToHex(integer: u32): string {
-  let res = new Array<string>();
-  do {
-    let t = integer / 16;
-    let r = integer % 16;
-    integer = t;
-    res.push(HEX_ALPHABET[r]);
-  } while (integer);
-  let hex = res.reverse().join('');
-  return hex.length % 2 ? "0" + hex : hex;
-}
-
-export function generateRandomColorHex(int:i32):string {
-  Math.seedRandom(int);
-  let rand = Math.floor(Math.random() * 16777215) as u32;
-  let hex = intToHex(rand);
-  return "#"+hex;
-}
-
-export function createRandomCorgi(name: string, seed: i32): Corgi {
-  let randDna = generateRandomDna();
-  let color = generateRandomColorHex(seed);
-  return _createCorgi(name, randDna, color);
-}
-
-export function getCorgi(tokenId: string): Corgi {
-  return corgis.get(tokenId);
-}
-
-export function setCorgi(corgi: Corgi): void {
-  corgis.set(corgi.dna, corgi);
-}
-
-export function getSender(): string {
-  return context.sender;
-}
-
-export function getCorgisByOwner(owner: string): CorgiArray {
-  return corgisByOwner.get(owner);
-}
-
-function setCorgisByOwner(corgi: Corgi): void {
-  let _corgis = getCorgisByOwner(corgi.owner).corgis;
-
-  if (_corgis == null) {
-    _corgis = new Array();
-    _corgis.push(corgi);
-  } else {
-    _corgis.push(corgi);
+export function listUserItems(accountId: string, offset: i32): i32[] {
+  assertAccountId(accountId);
+  assert(offset >= 0);
+  let itemIds = userItemsVec(accountId);
+  let resLen = min(RETURN_LIMIT, itemIds.length - offset);
+  if (resLen <= 0) {
+    return [];
   }
-
-  let ca = new CorgiArray();
-
-  ca.corgis = _corgis;
-  corgisByOwner.set(corgi.owner, ca);
+  let res = new Array<i32>(resLen);
+  for (let i = 0; i < resLen; ++i) {
+    res[i] = itemIds[i + offset];
+  }
+  return res;
 }
 
-export function setBalance(owner: string, balance: u64): void {
-  balances.set(owner, balance);
+export function getItem(itemId: i32): Item {
+  return items[itemId];
 }
 
-//ERROR handling
-function _corgiDNEError(corgi: Corgi): bool {
-  return assert(corgi == null, "This corgi does not exist");
+export function getItems(itemIds: i32[]): Item[] {
+  assert(itemIds.length <= RETURN_LIMIT);
+  return itemIds.map(getItem);
 }
 
-// simplified version of the ERC721
-// contract ERC721 {
-   // ERC20 compatible functions
-  //  function name() constant returns (string name);
-  //  function symbol() constant returns (string symbol);
+function assertSortedAndHave(sortedIds: i32[]): void {
+  let n = sortedIds.length;
+  assert(n >= 2 && n <= CRAFT_NUM_COMPONENTS_LIMIT, "Number of components should be between 2 and CRAFT_NUM_COMPONENTS_LIMIT");
+  for (let i = 1; i < n; ++i) {
+    assert(sortedIds[i] >= sortedIds[i - 1], "The list of items is unsorted");
+  }
+  let m = userItemsMap(context.sender);
+  sortedIds.forEach((itemId) => {
+    assert(m.get(itemId, -1) >= 0, "User doesn't have the item");
+  });
+}
 
-  //  function totalSupply() constant returns (uint256 totalSupply);
-  //  function balanceOf(address _owner) constant returns (uint balance);
+function hashSortedIds(sortedIds: i32[]): string {
+  return near.base58(near.hash(sortedIds.join()));
+}
 
-   // Functions that define ownership
-  //  function ownerOf(uint256 tokenId) constant returns (address owner);
+function getItemByHash(hash: string): Item {
+  let itemId = itemsMap.get(hash, -1);
+  return items.containsIndex(itemId) ? items[itemId] : null;
+}
 
-  //  function approve(address to, uint256 tokenId);
-  //  function takeOwnership(uint256 tokenId);
+function maybeAddItem(item: Item): void {
+  let m = userItemsMap(context.sender);
+  // Checking if the user doesn't have the item yet.
+  if (m.get(item.itemId, -1) < 0) {
+    let itemIds = userItemsVec(context.sender);
+    m.set(item.itemId, itemIds.push(item.itemId));
+  }
+}
 
-  // //  function transfer(address to, uint256 tokenId);
-  //  function tokenOfOwnerByIndex(address _owner, uint256 _index) constant returns (uint tokenId);
+// Mixing two-three items
+export function craft(sortedIds: i32[]): Item {
+  assertSortedAndHave(sortedIds);
+  let hash = hashSortedIds(sortedIds);
+  let item = getItemByHash(hash);
+  if (item) {
+    maybeAddItem(item);
+  }
+  return item;
+}
 
-  //  // Token metadata
-  //  function tokenMetadata(uint256 tokenId) constant returns (string infoUrl);
-
+export function invent(sortedIds: i32[], item: Item): Item {
+  assertSortedAndHave(sortedIds);
+  let hash = hashSortedIds(sortedIds);
+  assert(getItemByHash(item) == null, "Given recipe already exists");
+  item.itemId = items.length;
+  item.author = context.sender;
+  itemsMap.set(hash, items.push(item));
+  maybeAddItem(item);
+  return item;
+}

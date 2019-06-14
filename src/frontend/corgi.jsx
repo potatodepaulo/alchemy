@@ -1,83 +1,72 @@
-import React, {Component} from 'react';
+import React, { Component } from 'react';
+import SignIn from './signin.jsx'
+import Button from './button.jsx'
+class ItemObj {
+  constructor(id) {
+    this.id = id;
+    this.name = "Thing " + id;
+  }
 
-export default class Tokens extends Component {
+}
+
+export default class Alchemy extends Component {
   constructor(props) {
     super(props);
     this.state = {
       loaded: false,
-      corgis: [],
-      newCorgiName: "",
-      loggedIn: false
+      allItems: this.generateItems(),
+      selectedItems: []
     }
-    this.getCorgis = this.getCorgis.bind(this);
     this.handleChange = this.handleChange.bind(this);
     this.handleSubmit = this.handleSubmit.bind(this);
-    this.checkLoggedIn = this.checkLoggedIn.bind(this);
-    this.signedInFlow = this.signedInFlow.bind(this);
-    this.requestSignIn = this.requestSignIn.bind(this);
-    this.requestSignOut = this.requestSignOut.bind(this);
+    this.selectItem = this.selectItem.bind(this);
+    this.deselectItem = this.deselectItem.bind(this);
+    this.craftItems = this.craftItems.bind(this);
   }
 
-  componentWillMount() {
-    // This is where we get into trouble with global vars
-    // TODO: add sane state management and dependency injection
-    // This is more dependable than using the async 
-    let loggedIn = window.walletAccount.isSignedIn();
-    if (loggedIn) {
-      this.signedInFlow();
-    } else {
-      this.signedOutFlow();
+  generateItems() {
+    let items = [];
+    for (let i=0;i<10;i++) {
+      items.push(new ItemObj(i));
     }
+    return items;
   }
 
-  signedOutFlow() {
-    this.setState({
-      loggedIn:false,
-      loaded: true
-    });
+  async getItem(itemId) {
+    await this.props.contract.getItem({ itemId: itemId });
   }
 
-  async signedInFlow() {
-    const accountId = await this.props.wallet.getAccountId();
-    this.getCorgis(accountId).then(res => {
-      this.setState({
-        loggedIn: true
-      });
-      if (res == null || res.corgis.length < 1 || res.corgis == null) {
-        this.setState({
-          loaded: true
-        });
-      } else {
-        this.setState({
-          corgis: res.corgis,
-          loaded: true
-        });
-      }
+  async getItems(itemIds) {
+    await this.props.contract.getItems({ itemIds: itemIds })
+  }
+
+  async craftItems() {
+    let itemIds = this.state.selectedItems.map(item => item.id).sort();
+    await this.props.contract.craft({
+      sortedIds: itemIds
     })
   }
 
-  async checkLoggedIn() {
-    await this.props.wallet.isSignedIn();
+  selectItem(index) {
+    if (this.state.selectedItems.length >= 2) {
+      console.log("nah");
+      return null;
+    }
+    console.log(item);
+    let item = this.state.allItems[index]
+    let items = this.state.selectedItems;
+    items.push(item);
+    this.setState({
+      selectedItems: items
+    })
   }
 
-  async requestSignIn() {
-    await this.props.wallet.requestSignIn(
-      window.nearConfig.contractName,
-      window.nearConfig.appName
-    )
-  }
-
-  requestSignOut() {
-    this.props.wallet.signOut();
-    this.signedOutFlow();
-  }
-
-  getCorgis(owner) {
-    return this.props.contract.getCorgisByOwner({ owner: owner });
-  }
-
-  getCorgi(tokenId) {
-    return this.props.contract.getCorgi({ tokenId: tokenId })
+  deselectItem(index) {
+    let items = this.state.selectedItems;
+    items.splice(index, 1);
+    this.setState({
+      selectedItems:items
+    });
   }
 
   handleChange(e) {
@@ -92,181 +81,136 @@ export default class Tokens extends Component {
 
   handleSubmit(e) {
     e.preventDefault();
-    this.setState({ loaded:false });
-    this.props.contract.createRandomCorgi({
-      name: this.state.newCorgiName,
-      seed: this.randomInt()
-    }).then(res => {
-      // set the returned corgi to display in the frontend
-      let corgi = res.lastResult;
-      this.setState(state => {
-        let corgis = state.corgis.concat(corgi);
-        return {
-          newCorgiName: "",
-          loaded: true,
-          corgis:corgis
-        }
-      })
-    }).catch(err => {
-      console.log(err);
-    })
+    // TODO
   }
 
   render() {
-    if (this.state.loaded && this.state.loggedIn) {
-      return (
-        <div>
-          <Button action={this.requestSignOut} description="Sign out" />
-          <p>
-            <input 
-              id="newCorgiName"
-              type="text"
-              placeholder="Corgi name"
-              onChange={this.handleChange}
-              value={this.state.newCorgiName} />
-            <button onClick={this.handleSubmit}>Create Corgi!</button>
-          </p>
-          {this.state.corgis.length > 0 ? 
-            <ul>
-              <CorgiComponents 
-                trigger={this.signedInFlow} 
-                contract={this.props.contract} 
-                corgis={this.state.corgis} />
-            </ul>
-          : ""}
-        </div>
-      )
-    } else if (this.state.loaded) {
-      return (
-        <Button action={this.requestSignIn} description="Please Log In" />
-      )
-    } else {
-      return ("Loading...");
-    }
-  }
-}
-
-function CorgiComponents(props) {
-  return props.corgis.map(corgi => {
     return (
-      <li key={corgi.dna}>
-        <Corgi 
-          trigger={props.trigger}
-          contract={props.contract}
-          dna={corgi.dna}
-          name={corgi.name}
-          color={corgi.color} />
-      </li>
-    )
-  })
-}
-
-function Button(props) {
-  return(
-    <button onClick={props.action}>{props.description}</button>
-  )
-}
-
-class TransferCorgi extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      recipient: "",
-      loading: false
-    }
-    this.handleChange = this.handleChange.bind(this);
-    this.transferCorgi = this.transferCorgi.bind(this);
-  }
-
-  transferCorgi(e) {
-    e.preventDefault();
-    this.setState({loading: true});
-    console.log(this.props.corgiDNA, this.state.recipient);
-    this.props.contract.transfer({
-      to: this.state.recipient,
-      tokenId: this.props.corgiDNA})
-    .then(res => {
-      this.props.trigger();
-      this.setState({loading: false});
-    }).catch(err => {
-      console.log(err);
-    })
-  }
-
-  handleChange(e) {
-    this.setState({
-      [e.target.id]: e.target.value
-    });
-  }
-  
-  render() {
-    return (
-      <div>
-        {!this.state.loading ?
-          <React.Fragment>
-            <input id="recipient"
-              type="text"
-              placeholder="Corgi recipient"
-              onChange={this.handleChange}
-              value={this.state.recipient} />
-            <Button action={this.transferCorgi} description="Transfer" />
-          </React.Fragment>
-        : "Loading..."}
-      </div>
-    )
-  }
-}
-
-class Corgi extends Component {
-  render () {
-    let specificColor = { 
-      backgroundColor: this.props.color 
-    };
-    return (
-      <div className="wrapper">
-        <div className="resize" id="corgi_wrap">
-          <div className="corgi_head_area">
-            <div className="fuwa corgi_face_area">
-              <div style={specificColor} className="corgi_face_before"></div>
-              <div className="corgi_face white">
-                <div style={specificColor} className="corgi_face_after"></div>
-                <div className="eye-left"></div>
-                <div className="eye-right"></div>
-                <div className="corgi_nose white">
-                  <div className="nose"></div>
-                </div>
-                <div style={specificColor} className="ear-left brown"></div>
-                <div style={specificColor} className="ear-right brown"></div>
+      <React.Fragment>
+        <nav>Top Nav</nav>
+        <SignIn wallet={this.props.wallet} />
+        <div className="Alchemy">
+          <ContentContainer>
+            {this.state.selectedItems.length > 0 ?
+              <div>
+                {this.state.selectedItems.map((item, i) => {
+                  return (
+                    <DeselectWrapper key={item.id} last={i + 1 === this.state.selectedItems.length} >
+                      <Item
+                        index={i}  
+                        callback={this.deselectItem}
+                        id={item.id}
+                        name={item.name}
+                        image={item.image} />
+                    </DeselectWrapper>)
+                })}
+                <Button disabled={this.state.selectedItems.length < 2} action={this.craftItems} description="Craft" />
               </div>
-            </div>
-            <div className="corgi_breast white">
-            </div>
-            <div style={specificColor} className="leg_fr_left brown"></div>
-            <div style={specificColor} className="leg_fr_right brown"></div>
-          </div>
-          <div className="corgi_body_area">
-            <div style={specificColor} className="corgi_body brown"></div>
-          </div>
-          <div className="corgi_tail_area">
-            <div style={specificColor} className="corgi_hip brown" id="hip">
-              <div style={specificColor} className="corgi_hip_after"></div>
-              <div style={specificColor} className="leg_ba_left brown"></div>
-              <div style={specificColor} className="leg_ba_right brown"></div>
-            </div>
-          </div>
+              :
+              <p >
+                Select items to craft
+              </p>
+            }
+          </ContentContainer>
+          <RightSideNav>
+            <List callback={this.selectItem} items={this.state.allItems} />
+          </RightSideNav>
         </div>
-        <div>
+      </React.Fragment>
+      )
+  }
+}
+
+class DeselectWrapper extends Component {
+  render() {
+    return(
+      <div className="DeselectWrapper">
+        <div className="DeselectItem">
+          { this.props.children }
         </div>
-        <div className="note">Drag for length</div>
-        <div>
-          <TransferCorgi
-            trigger={this.props.trigger}
-            contract={this.props.contract}
-            corgiDNA={this.props.dna}
-            handleChange={this.handleChange} />
-        </div>
-        <div className="note">{this.props.name}</div>
+        {this.props.last ? "" : 
+          <p className="plus">+</p>
+        }
       </div>
     )
+  }
+}
+
+class ContentContainer extends Component {
+  render() {
+    return(
+      <div className="ContentContainer">
+        { this.props.children }
+      </div>
+    )
+  }
+}
+
+class RightSideNav extends Component {
+  render() {
+    return(
+      <div className="RightSideNav">
+        { this.props.children }
+      </div>
+    )
+  }
+}
+
+class List extends Component {
+
+  compareArray(_a, _b) {
+    let a,b;
+    [a,b] = [_a.id, _b.id];
+    if (a < b || a == null)
+      return 1;
+    if (a > b)
+      return -1;
+    return 0;
+  }
+
+  sortArray() {
+    return this.props.items.sort(this.compareArray);
+  }
+
+  render() {
+    let sortedItems = this.sortArray();
+    let items = sortedItems.map((item, i) => {
+      return <Item
+        callback={this.props.callback}
+        index={i}
+        key={item.id}
+        id={item.id}
+        name={item.name}
+        image={item.image} />
+    });
+    return (
+      <ul>
+        {items}
+      </ul>
+    );
+  }
+}
+
+class Item extends React.Component {
+  constructor(props){
+    super(props)
+    this.handleClick = this.handleClick.bind(this);
+  }
+
+  handleClick(e) {
+    e.preventDefault(e);
+    console.log(this.props.index);
+    // TODO: Non-shitty events and shit
+    this.props.callback(this.props.index);
+  }
+
+  render() {
+    return (
+      <li className="Item" onClick={ this.handleClick } >
+        <div className="Image"
+          style={{ backgroundImage: 'url(' + this.props.image + ')' }} > </div>
+        <div className="Name" > {this.props.name} </div>
+      </li>
+    );
   }
 }

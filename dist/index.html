@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html>
 
 <head>
@@ -10,25 +10,11 @@
 
 <body>
   <div class="container">
-    <h1>Hello, you have got a Corgi!</h1>
 
-    <p>Here is how you use can interact with the smart contract powering these Corgis. See below for a simple frontend for corgis with uniqe fur color!</p>
-
-    <p>To init:</p>
-    <pre>contract.init({initialOwner: nearlib.dev.myAccountId})
-    </pre>
-
-    <p>To create a Corgi</p>
-    <pre>contract.createRandomCorgi({name: "Winifred The Corgi King", seed: 1})
-    </pre>
-
-    <p>To send a Corgi:</p>
-    <pre>contract.transfer({to: 'bob.near', tokenId: 'a233safhj23'})
-    </pre>
-
-    <div id="tokens">
+    <div id="alchemy">
       Loading...
     </div>
+    
   </div>
   <script src="https://cdn.jsdelivr.net/npm/nearlib@0.7.1/dist/nearlib.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
